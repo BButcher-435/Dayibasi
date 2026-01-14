@@ -1,7 +1,37 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext'; // <--- YENİ
+import axios from 'axios';
+const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setMessage('');
 
+    try {
+      const token = localStorage.getItem('userToken');
+      
+      // 1. Backend'e kaydet (YENİ KISIM)
+      await axios.put('http://localhost:3000/update-profile', formData, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      // 2. Frontend State'ini güncelle
+      updateProfile(formData);
+
+      setMessage('Profil bilgileriniz başarıyla güncellendi!');
+      
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 1000);
+      
+    } catch (err) {
+      console.error(err);
+      setMessage('Güncelleme başarısız! Sunucu hatası.');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
 const ProfileSettings = () => {
   const { user, updateProfile } = useAuth(); // <--- Context'ten veriyi ve fonksiyonu al
   const navigate = useNavigate();

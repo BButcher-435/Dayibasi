@@ -1,48 +1,27 @@
 const { db } = require('../config/firebase');
 
-// Dosya yüklendiğinde bu logu görmeliyiz
 console.log("✅ jobsController.js dosyası yüklendi ve hazır!");
 
+// --- İLAN OLUŞTURMA (MEVCUT) ---
 exports.createJob = async (req, res) => {
-  console.log("--> jobsController.createJob FONKSİYONU BAŞLADI <--");
-
+  console.log("--> createJob BAŞLADI");
   try {
-    // 1. Kullanıcı verisini kontrol et
-    if (!req.user) {
-        console.log("❌ HATA: req.user tanımlı değil! Middleware veriyi taşıyamamış.");
-        return res.status(500).json({ error: "Sunucu hatası: Kullanıcı bilgisi eksik." });
-    }
+    if (!req.user) return res.status(500).json({ error: "Kullanıcı bilgisi eksik." });
     const { uid } = req.user;
-    console.log("1. Kullanıcı UID:", uid);
-
-    // 2. Body verisini kontrol et
-    console.log("2. Gelen Body Verisi:", req.body);
     const { title, description, price, location, category, deadline } = req.body;
 
     if (!title || !description || !price) {
-      console.log("❌ HATA: Eksik veri.");
-      return res.status(400).json({ error: 'Başlık, açıklama ve ücret zorunludur.' });
+      return res.status(400).json({ error: 'Eksik veri.' });
     }
 
-    // 3. Veritabanı bağlantısını kontrol et
-    console.log("3. Firestore'a bağlanılıyor (users)...");
     const userDoc = await db.collection('users').doc(uid).get();
+    if (!userDoc.exists) return res.status(404).json({ error: 'Kullanıcı bulunamadı.' });
     
-    if (!userDoc.exists) {
-        console.log("❌ HATA: Kullanıcı veritabanında yok!");
-        return res.status(404).json({ error: 'Kullanıcı bulunamadı.' });
-    }
-    console.log("✅ Kullanıcı verisi çekildi:", userDoc.data().role);
-
-    // 4. Rol Kontrolü
     const userData = userDoc.data();
     if (userData.role !== 'employer') {
-      console.log("⛔ YETKİSİZ: Kullanıcı işveren değil.");
-      return res.status(403).json({ error: 'Yetkisiz işlem! Sadece işverenler ilan açabilir.' });
+      return res.status(403).json({ error: 'Sadece işverenler ilan açabilir.' });
     }
 
-    // 5. Kayıt İşlemi
-    console.log("4. İlan hazırlanıyor...");
     const newJob = {
       employerId: uid,
       employerName: `${userData.firstName} ${userData.lastName}`,
@@ -56,38 +35,94 @@ exports.createJob = async (req, res) => {
       createdAt: new Date().toISOString()
     };
 
-    console.log("5. Firestore'a yazılıyor (jobs)...");
     const jobRef = await db.collection('jobs').add(newJob);
-    console.log("✅ İlan başarıyla kaydedildi! ID:", jobRef.id);
-
-    // 6. Yanıt Gönder
+    
     return res.status(201).json({ 
-      message: 'İlan başarıyla oluşturuldu.', 
+      message: 'İlan oluşturuldu.', 
       jobId: jobRef.id,
       job: newJob
     });
 
   } catch (error) {
-    console.error("🔥 CONTROLLER İÇİNDE KRİTİK HATA:", error);
-    return res.status(500).json({ error: 'İlan oluşturulurken bir hata oluştu: ' + error.message });
+    console.error("HATA:", error);
+    return res.status(500).json({ error: 'Sunucu hatası: ' + error.message });
   }
 };
 
-// Diğer fonksiyonlar (şimdilik boş da olsa tanımlı kalsın ki import hatası almayalım)
+// --- TÜM İLANLARI LİSTELE (YENİ - SARI BÖLGE 1) ---
 exports.getAllJobs = async (req, res) => {
-    // Listeleme kodları...
-    res.json([]); 
+  try {
+    // Sadece 'active' durumdaki ilanları çekelim
+    // Eğer tümünü çekmek istersen .where kısmını silebilirsin
+    const jobsSnapshot = await db.collection('jobs')
+        //.where('status', '==', 'active') // İsteğe bağlı filtre
+        .orderBy('createdAt', 'desc') // En yeniler üstte
+        .get();
+
+    const jobs = [];
+    jobsSnapshot.forEach(doc => {
+      jobs.push({ id: doc.id, ...doc.data() });
+    });
+
+    res.status(200).json(jobs);
+  } catch (error) {
+    console.error("İlanları çekme hatası:", error);
+    res.status(500).json({ error: 'İlanlar alınamadı.' });
+  }
 };
 
+// --- İŞE BAŞVURU YAP (YENİ - SARI BÖLGE 2) ---
 exports.applyJob = async (req, res) => {
-    // Başvuru kodları...
+  try {
+    const { id } = req.params; // Job ID
+    const { uid } = req.user;  // Başvuran İşçinin ID'si (Token'dan gelir)
+
+    // 1. İlan var mı?
+    const jobDoc = await db.collection('jobs').doc(id).get();
+    if (!jobDoc.exists) {
+      return res.status(404).json({ error: 'İlan bulunamadı.' });
+    }
+
+    // 2. İşveren kendi ilanına başvuramasın
+    if (jobDoc.data().employerId === uid) {
+      return res.status(400).json({ error: 'Kendi ilanınıza başvuramazsınız.' });
+    }
+
+    // 3. Mükerrer başvuru kontrolü (Daha önce başvurmuş mu?)
+    const existingApp = await db.collection('applications')
+      .where('jobId', '==', id)
+      .where('workerId', '==', uid)
+      .get();
+
+    if (!existingApp.empty) {
+      return res.status(400).json({ error: 'Bu ilana zaten başvurdunuz.' });
+    }
+
+    // 4. Başvuranın ismini al (Listelemede kolaylık olsun diye kaydediyoruz)
+    const userDoc = await db.collection('users').doc(uid).get();
+    const userData = userDoc.data();
+
+    // 5. Başvuruyu Kaydet
+    const newApplication = {
+      jobId: id,
+      workerId: uid,
+      workerName: `${userData.firstName} ${userData.lastName}`,
+      employerId: jobDoc.data().employerId, // İlan sahibini de ekleyelim, sorgularken lazım olur
+      status: 'pending', // pending, accepted, rejected
+      appliedAt: new Date().toISOString()
+    };
+
+    await db.collection('applications').add(newApplication);
+
+    res.status(201).json({ message: 'Başvurunuz başarıyla alındı.' });
+
+  } catch (error) {
+    console.error("Başvuru hatası:", error);
+    res.status(500).json({ error: 'Başvuru sırasında hata oluştu.' });
+  }
 };
-// ... (createJob, getAllJobs ve applyJob fonksiyonlarının altına ekle) ...
 
-// --- TEK BİR İLANI DETAYLI GETİR ---
-// ... (createJob, getAllJobs ve applyJob fonksiyonlarının altına ekle) ...
-
-// --- TEK BİR İLANI DETAYLI GETİR ---
+// --- TEK İLAN DETAYI (MEVCUT) ---
 exports.getJob = async (req, res) => {
   try {
     const { id } = req.params;
@@ -99,9 +134,9 @@ exports.getJob = async (req, res) => {
 
     let jobData = { id: doc.id, ...doc.data() };
 
-    // EKSTRA: Bu ilana kaç kişi başvurmuş? Sayısını bulalım.
+    // Başvuru sayısını ekle
     const appsSnapshot = await db.collection('applications').where('jobId', '==', id).get();
-    jobData.applicantCount = appsSnapshot.size; // Frontend'de kullanacağız
+    jobData.applicantCount = appsSnapshot.size;
 
     res.status(200).json(jobData);
   } catch (error) {
@@ -110,21 +145,19 @@ exports.getJob = async (req, res) => {
   }
 };
 
-// --- BAŞVURANLARI LİSTELE (Sadece İlan Sahibi Görebilir) ---
+// --- BAŞVURANLARI LİSTELE (MEVCUT) ---
 exports.getJobApplicants = async (req, res) => {
   try {
-    const { id } = req.params; // Job ID
-    const { uid } = req.user;  // İstek yapan kullanıcının ID'si
+    const { id } = req.params; 
+    const { uid } = req.user; 
 
-    // 1. İlanı bul ve sahibi kim kontrol et
     const jobDoc = await db.collection('jobs').doc(id).get();
     if (!jobDoc.exists) return res.status(404).json({ error: 'İlan bulunamadı' });
 
     if (jobDoc.data().employerId !== uid) {
-      return res.status(403).json({ error: 'Bu ilanın başvurularını görüntüleme yetkiniz yok.' });
+      return res.status(403).json({ error: 'Yetkisiz erişim.' });
     }
 
-    // 2. Başvuruları çek
     const appsSnapshot = await db.collection('applications').where('jobId', '==', id).get();
     
     const applicants = [];
@@ -138,4 +171,83 @@ exports.getJobApplicants = async (req, res) => {
     console.error("Başvuranları çekme hatası:", error);
     res.status(500).json({ error: 'Başvuranlar alınamadı' });
   }
+};
+// ... (Diğer fonksiyonların altına ekle)
+
+// --- DASHBOARD VERİLERİ (YENİ - KIRMIZI BÖLGE) ---
+exports.getDashboardStats = async (req, res) => {
+  try {
+    const { uid } = req.user;
+    
+    // 1. Kullanıcı Rolünü Bul
+    const userDoc = await db.collection('users').doc(uid).get();
+    if (!userDoc.exists) return res.status(404).json({ error: 'Kullanıcı bulunamadı' });
+    const role = userDoc.data().role;
+
+    let items = [];
+
+    if (role === 'employer') {
+      // İŞVEREN İSE: Kendi açtığı ilanları getir
+      const snapshot = await db.collection('jobs')
+        .where('employerId', '==', uid)
+        .orderBy('createdAt', 'desc')
+        .get();
+      
+      snapshot.forEach(doc => items.push({ id: doc.id, ...doc.data() }));
+
+    } else {
+      // İŞÇİ İSE: Başvurduğu işleri getir
+      const appsSnapshot = await db.collection('applications')
+        .where('workerId', '==', uid)
+        .orderBy('appliedAt', 'desc')
+        .get();
+      
+      // Başvuruların iş detaylarını (Başlık, Fiyat) da çekmemiz lazım
+      const promises = appsSnapshot.docs.map(async (doc) => {
+        const appData = doc.data();
+        // İlgili iş detayını jobID ile çek
+        const jobDoc = await db.collection('jobs').doc(appData.jobId).get();
+        const jobData = jobDoc.exists ? jobDoc.data() : { title: 'Silinmiş İlan', price: 0 };
+        
+        return {
+          id: doc.id,
+          ...appData,
+          title: jobData.title, // İlan başlığı
+          price: jobData.price,
+          status: appData.status // Başvuru durumu (pending, accepted vs.)
+        };
+      });
+
+      items = await Promise.all(promises);
+    }
+
+    res.status(200).json({ role, items });
+
+  } catch (error) {
+    console.error("Dashboard veri hatası:", error);
+    res.status(500).json({ error: 'Veriler alınamadı.' });
+  }
+  // ... (Diğer fonksiyonların altına)
+
+// --- BAŞVURU KONTROLÜ (YENİ) ---
+exports.checkApplicationStatus = async (req, res) => {
+  try {
+    const { id } = req.params; // Job ID
+    const { uid } = req.user;  // User ID
+
+    const snapshot = await db.collection('applications')
+      .where('jobId', '==', id)
+      .where('workerId', '==', uid)
+      .get();
+
+    // Eğer doküman varsa başvuru yapılmış demektir
+    const hasApplied = !snapshot.empty;
+    
+    res.status(200).json({ hasApplied });
+
+  } catch (error) {
+    console.error("Başvuru kontrol hatası:", error);
+    res.status(500).json({ error: 'Kontrol yapılamadı' });
+  }
+};
 };
