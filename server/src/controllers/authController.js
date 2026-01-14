@@ -1,50 +1,81 @@
-const admin = require('../config/firebase');
+const { auth, db } = require('../config/firebase'); // Config klasöründen çektik
+const axios = require('axios');
 
+// --- REGISTER (KAYIT) ---
 exports.register = async (req, res) => {
-  console.log(">>> 1. Register Fonksiyonu Başladı");
-  
-  // Gelen veriyi görelim (Şifreyi güvenlik için maskelemiyorum şu an, testteyiz)
-  console.log(">>> Gelen Veri (Body):", req.body);
+  const { email, password, firstName, lastName, phone, role } = req.body;
 
-  const { email, password, displayName } = req.body;
-
+  // Basit validasyon
   if (!email || !password || password.length < 6) {
-    console.log(">>> HATA: Validasyon başarısız.");
-    return res.status(400).json({ 
-      error: "Geçersiz veri. Şifre en az 6 karakter olmalı." 
-    });
+    return res.status(400).json({ error: "E-posta veya şifre geçersiz (min 6 karakter)." });
   }
 
   try {
-    console.log(">>> 2. Firebase'e istek gönderiliyor...");
-    
-    const userRecord = await admin.auth().createUser({
+    // 1. Auth Kullanıcısı Oluştur
+    const userRecord = await auth.createUser({
       email,
       password,
-      displayName,
+      displayName: `${firstName} ${lastName}`
     });
 
-    console.log(">>> 3. Firebase Kaydı Başarılı! ID:", userRecord.uid);
+    // 2. Detayları Firestore'a Kaydet
+    // 'users' koleksiyonuna UID ile döküman açıyoruz
+    await db.collection('users').doc(userRecord.uid).set({
+      firstName,
+      lastName,
+      email,
+      phone,
+      role: role || 'worker', // Seçilmezse varsayılan 'worker'
+      createdAt: new Date().toISOString(),
+      uid: userRecord.uid
+    });
 
-    return res.status(201).json({ 
-      message: "Kayıt başarılı", 
-      user: userRecord 
+    res.status(201).json({ message: "Kayıt Başarılı", uid: userRecord.uid });
+
+  } catch (error) {
+    console.error("Register Hatası:", error);
+    
+    if (error.code === 'auth/email-already-exists') {
+        return res.status(409).json({ error: "Bu e-posta zaten kullanımda." });
+    }
+    
+    res.status(400).json({ error: "Kayıt işlemi başarısız." });
+  }
+};
+
+// --- LOGIN (GİRİŞ) ---
+exports.login = async (req, res) => {
+  const { email, password } = req.body;
+  
+  // BURAYA KENDİ WEB API KEY'İNİ YAPIŞTIRMAYI UNUTMA
+  const FIREBASE_API_KEY = "BURAYA_FIREBASE_WEB_API_KEY_GELECEK"; 
+
+  const url = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${FIREBASE_API_KEY}`;
+
+  try {
+    // Firebase REST API ile giriş yap
+    const response = await axios.post(url, {
+      email,
+      password,
+      returnSecureToken: true
+    });
+
+    const { idToken, localId } = response.data;
+    
+    // Kullanıcının rolünü öğrenmek için veritabanına sor
+    const userDoc = await db.collection('users').doc(localId).get();
+    const userData = userDoc.exists ? userDoc.data() : {};
+
+    res.status(200).json({ 
+      message: "Giriş Başarılı", 
+      token: idToken, 
+      uid: localId,
+      role: userData.role || 'worker', // Frontend'e rolü gönderiyoruz
+      name: userData.firstName || ''
     });
 
   } catch (error) {
-    console.log(">>> 4. HATA YAKALANDI!");
-    // Hatanın tamamını yazdıralım ki ne olduğunu görelim
-    console.log("DETAYLI HATA:", error); 
-    console.log("Hata Kodu:", error.code);
-
-    if (error.code === 'auth/email-already-exists') {
-      return res.status(409).json({ error: "Bu e-posta adresi zaten kullanımda." });
-    }
-    
-    if (error.code === 'auth/invalid-password') {
-      return res.status(400).json({ error: "Şifre çok zayıf veya geçersiz." });
-    }
-
-    return res.status(500).json({ error: "Sunucu hatası: Kayıt yapılamadı." });
+    console.error("Login Hatası:", error.response?.data?.error?.message || error.message);
+    res.status(401).json({ error: "E-posta veya şifre hatalı!" });
   }
 };
