@@ -1,10 +1,10 @@
-# 📡 Dayıbaşı (İşBul) V4 - Full Stack İş Platformu
+# Dayıbaşı (İşBul) V4 - Full Stack İş Platformu
 
 Dayıbaşı, işverenler ile günlük/saha işçilerini buluşturan, güvenli ödeme (simüle), iş takibi ve puanlama sistemine sahip kapsamlı bir Full Stack mobil uyumlu web uygulamasıdır.
 
 
 
-## 🚀 Öne Çıkan Özellikler
+## Öne Çıkan Özellikler
 
 * **Çift Rol Sistemi:** Kullanıcılar kayıt aşamasında `İşçi` veya `İşveren` rolünü seçer.
 * **İlan Yönetimi:** İşverenler ilan açabilir, başvuruları görüntüleyebilir ve uygun adayı "İşe Al" butonuyla seçebilir.
@@ -15,7 +15,7 @@ Dayıbaşı, işverenler ile günlük/saha işçilerini buluşturan, güvenli ö
 
 ---
 
-## 🛠️ Teknik Yığın (Tech Stack)
+## Teknik Yığın (Tech Stack)
 
 **Frontend:**
 * React.js (Context API ile State Yönetimi)
@@ -31,9 +31,9 @@ Dayıbaşı, işverenler ile günlük/saha işçilerini buluşturan, güvenli ö
 
 ---
 
-## 🏗️ Proje Yapısı ve Diyagramı
+## Proje Yapısı ve Diyagramı
 
-```mermaid
+``` mermaid
 graph TD
     subgraph "Frontend (React)"
         A[App.jsx] --> B[AuthContext.jsx]
