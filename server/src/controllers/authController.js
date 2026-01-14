@@ -79,8 +79,11 @@ exports.login = async (req, res) => {
       message: "Giriş Başarılı", 
       token: idToken, 
       uid: localId,
-      role: userData.role || 'worker', // Frontend'e rolü gönderiyoruz
-      name: userData.firstName || ''
+      role: userData.role || 'worker',
+      // Aşağıdaki satırları ekle ki frontend bunları alabilsin
+      firstName: userData.firstName,
+      lastName: userData.lastName,
+      email: userData.email
     });
 
   } catch (error) {

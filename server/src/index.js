@@ -1,27 +1,17 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 
-// --- CONTROLLER IMPORTLARI ---
-const { register, login } = require('./controllers/authController');
-
-// DİKKAT: Dosya ismin 'jobscontroller.js' olduğu için küçük harfle çağırıyoruz
-const { 
-  createJob, 
-  getAllJobs, 
-  applyJob, 
-  getJob, 
-  getJobApplicants 
-} = require('./controllers/jobscontroller');
-
-// --- MIDDLEWARE IMPORTLARI ---
-const verifyToken = require('./middleware/authMiddleware');
+// Route Dosyalarını Çağır
+const authRoutes = require('./routes/authRoutes');
+const jobsRoutes = require('./routes/JobsRoutes');
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
-// --- LOG MIDDLEWARE ---
+// Log Middleware (İstekleri görmek için)
 app.use((req, res, next) => {
   console.log(`📡 İSTEK GELDİ: ${req.method} ${req.url}`);
   next();
@@ -32,27 +22,14 @@ app.get('/', (req, res) => {
   res.send('Server (isbul v4) Hazır! 🚀');
 });
 
-// 1. Auth Rotaları
-app.post('/register', register);
-app.post('/login', login);
+// Auth rotalarını ana dizine bağlıyoruz (/register, /login çalışmaya devam etsin diye)
+app.use('/', authRoutes);
 
-// 2. İş (Job) Rotaları
-// İlan Oluşturma (Sadece İşveren)
-app.post('/jobs', verifyToken, createJob);
+// Job rotalarını '/jobs' altına topluyoruz
+// Örn: jobsRoutes içindeki '/' artık '/jobs' oldu.
+app.use('/jobs', jobsRoutes);
 
-// Tüm İlanları Listeleme (Herkese Açık)
-app.get('/jobs', getAllJobs);
-
-// Tek İlan Detayı (Herkese Açık)
-app.get('/jobs/:id', getJob);
-
-// İşe Başvuru (Sadece İşçi)
-app.post('/jobs/:id/apply', verifyToken, applyJob);
-
-// Başvuranları Listeleme (Sadece İlan Sahibi)
-app.get('/jobs/:id/applicants', verifyToken, getJobApplicants);
-
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server ${PORT} portunda çalışıyor...`);
 });

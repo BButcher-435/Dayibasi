@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext'; // <--- YENİ
 
 const ProfileSettings = () => {
-  const [user, setUser] = useState({
+  const { user, updateProfile } = useAuth(); // <--- Context'ten veriyi ve fonksiyonu al
+  const navigate = useNavigate();
+
+  const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
     email: '',
@@ -12,25 +16,22 @@ const ProfileSettings = () => {
   
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
-  const navigate = useNavigate();
 
+  // Sayfa açıldığında context'teki veriyi forma doldur
   useEffect(() => {
-    const firstName = localStorage.getItem('userFirstName') || '';
-    const lastName = localStorage.getItem('userLastName') || '';
-    const email = localStorage.getItem('userEmail') || '';
-    const phone = localStorage.getItem('userPhone') || '';
-
-    setUser({
-      firstName,
-      lastName,
-      email,
-      phone,
-      bio: ''
-    });
-  }, []);
+    if (user) {
+      setFormData({
+        firstName: user.firstName || '',
+        lastName: user.lastName || '',
+        email: user.email || '',
+        phone: user.phone || '',
+        bio: user.bio || '' // Eğer bio varsa
+      });
+    }
+  }, [user]);
 
   const handleChange = (e) => {
-    setUser({ ...user, [e.target.name]: e.target.value });
+    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const handleSubmit = async (e) => {
@@ -39,18 +40,16 @@ const ProfileSettings = () => {
     setMessage('');
 
     try {
-      // LocalStorage'ı güncelle
-      localStorage.setItem('userFirstName', user.firstName);
-      localStorage.setItem('userLastName', user.lastName);
-      localStorage.setItem('userEmail', user.email);
-      localStorage.setItem('userPhone', user.phone);
-      localStorage.setItem('userName', `${user.firstName} ${user.lastName}`);
+      // Context üzerinden güncelle (API isteği burada da yapılabilir ama şimdilik state güncelliyoruz)
+      // Gerçek projede burada önce axios.put('/users/me') yapılır, sonra updateProfile çağrılır.
+      updateProfile(formData);
 
-      setMessage('Profil bilgileriniz güncellendi!');
+      setMessage('Profil bilgileriniz başarıyla güncellendi!');
       
+      // Hızlıca dashboard'a dön
       setTimeout(() => {
         navigate('/dashboard');
-      }, 1500);
+      }, 1000);
       
     } catch (err) {
       setMessage('Güncelleme başarısız!');
@@ -84,7 +83,7 @@ const ProfileSettings = () => {
               <input
                 type="text"
                 name="firstName"
-                value={user.firstName}
+                value={formData.firstName}
                 onChange={handleChange}
                 required
                 style={{width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '6px'}}
@@ -96,7 +95,7 @@ const ProfileSettings = () => {
               <input
                 type="text"
                 name="lastName"
-                value={user.lastName}
+                value={formData.lastName}
                 onChange={handleChange}
                 required
                 style={{width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '6px'}}
@@ -109,7 +108,7 @@ const ProfileSettings = () => {
             <input
               type="email"
               name="email"
-              value={user.email}
+              value={formData.email}
               onChange={handleChange}
               required
               style={{width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '6px'}}
@@ -121,21 +120,9 @@ const ProfileSettings = () => {
             <input
               type="tel"
               name="phone"
-              value={user.phone}
+              value={formData.phone}
               onChange={handleChange}
               placeholder="05xx xxx xx xx"
-              style={{width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '6px'}}
-            />
-          </div>
-
-          <div>
-            <label style={{display: 'block', marginBottom: '5px', fontWeight: '600'}}>Hakkımda</label>
-            <textarea
-              name="bio"
-              value={user.bio}
-              onChange={handleChange}
-              placeholder="Kendinizden kısaca bahsedin..."
-              rows="3"
               style={{width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '6px'}}
             />
           </div>

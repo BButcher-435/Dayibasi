@@ -1,19 +1,18 @@
-// src/utils/emailService.js
 const nodemailer = require('nodemailer');
+// Garanti olsun diye burada da çağırıyoruz
+require('dotenv').config(); 
 
-// Gmail kullanacaksan "Uygulama Şifresi" (App Password) almalısın.
-// Normal şifrenle çalışmaz.
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
-    user: 'xxxxxxxx@gmail.com', // BURAYI DÜZENLE
-    pass: 'xxxxxxxxx'  // BURAYI DÜZENLE
+    user: process.env.EMAIL_USER, // Artık şifre kodun içinde değil!
+    pass: process.env.EMAIL_PASS
   }
 });
 
 const sendVerificationEmail = async (email, link) => {
   const mailOptions = {
-    from: '"IsBul Destek" <xxxxxx@gmail.com>',
+    from: `"IsBul Destek" <${process.env.EMAIL_USER}>`,
     to: email,
     subject: 'Lütfen Hesabınızı Doğrulayın',
     html: `<h3>Hoşgeldiniz!</h3>
@@ -23,10 +22,9 @@ const sendVerificationEmail = async (email, link) => {
 
   try {
     await transporter.sendMail(mailOptions);
-    console.log("Doğrulama maili gönderildi: " + email);
+    console.log("✅ Doğrulama maili gönderildi: " + email);
   } catch (error) {
-    console.error("Mail gönderme hatası:", error);
-    // Hata olsa bile akışı kırmamak için throw etmiyoruz şimdilik
+    console.error("❌ Mail gönderme hatası:", error);
   }
 };
 

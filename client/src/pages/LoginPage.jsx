@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext'; // <--- YENİ
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  
   const navigate = useNavigate();
+  const { login } = useAuth(); // <--- Context'ten login fonksiyonunu al
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -20,19 +23,15 @@ const LoginPage = () => {
         password: password
       });
 
-      // LOCALSTORAGE'A KAYDET
-      localStorage.setItem('userToken', response.data.token);
-      localStorage.setItem('userUid', response.data.uid);
-      localStorage.setItem('userFirstName', response.data.firstName);
-      localStorage.setItem('userLastName', response.data.lastName);
-      localStorage.setItem('userName', `${response.data.firstName} ${response.data.lastName}`);
-      localStorage.setItem('userRole', response.data.role); // ROLE'Ü KAYDET
-      localStorage.setItem('userEmail', response.data.email);
+      // Eski localStorage kodları ÇÖP KUTUSUNA!
+      // Tek satırla context'i güncelle:
+      login(response.data); 
 
       navigate('/dashboard');
 
     } catch (err) {
-      setError('Giriş yapılamadı!');
+      console.error(err); // Hatayı konsola yazdıralım
+      setError('Giriş yapılamadı! Lütfen bilgilerinizi kontrol edin.');
     } finally {
       setLoading(false);
     }
