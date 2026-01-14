@@ -10,7 +10,7 @@ import Billing from './pages/Billing';
 import Dispute from './pages/Dispute';
 import Rating from './pages/Rating';
 import ProfileSettings from './pages/ProfileSettings';
-
+import Applicants from './pages/Applicants'; // [YENİ]
 // PROFİL DROPDOWN
 const ProfileDropdown = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -260,6 +260,7 @@ function App() {
           <Route path="/job/:id/dispute" element={<Dispute />} />
           <Route path="/job/:id/rate" element={<Rating />} />
           <Route path="/profile" element={<ProfileSettings />} />
+          <Route path="/job/:id/applicants" element={<Applicants />} />
         </Routes>
       </div>
     </BrowserRouter>

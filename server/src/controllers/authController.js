@@ -48,7 +48,7 @@ exports.login = async (req, res) => {
   const { email, password } = req.body;
   
   // BURAYA KENDİ WEB API KEY'İNİ YAPIŞTIRMAYI UNUTMA
-  const FIREBASE_API_KEY = "BURAYA_FIREBASE_WEB_API_KEY_GELECEK"; 
+  const FIREBASE_API_KEY = "AIzaSyDuM_TtsSk2p9Np4t0H3rV3r492tmNcqwo"; 
 
   const url = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${FIREBASE_API_KEY}`;
 

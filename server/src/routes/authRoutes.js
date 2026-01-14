@@ -11,7 +11,9 @@ const { register } = require("../controllers/authController");
 
 // --- AKTİF ROTALAR ---
 router.post("/register", register);
-
+// İş (Job) Rotaları
+app.post('/jobs', verifyToken, createJob); // İlan oluşturma (Korumalı)
+app.get('/jobs', getAllJobs);              // İlanları listeleme (Herkese açık)
 
 // --- HENÜZ HAZIR OLMAYAN ROTALAR (İleride açacağız) ---
 
