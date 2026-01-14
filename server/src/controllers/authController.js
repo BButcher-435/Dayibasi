@@ -1,4 +1,7 @@
-const { auth, db } = require('../config/firebase'); // Config klasöründen çektik
+// En üstte .env dosyasını yüklüyoruz
+require('dotenv').config();
+
+const { auth, db } = require('../config/firebase'); 
 const axios = require('axios');
 
 // --- REGISTER (KAYIT) ---
@@ -47,8 +50,14 @@ exports.register = async (req, res) => {
 exports.login = async (req, res) => {
   const { email, password } = req.body;
   
-  // BURAYA KENDİ WEB API KEY'İNİ YAPIŞTIRMAYI UNUTMA
-  const FIREBASE_API_KEY = "AIzaSyDuM_TtsSk2p9Np4t0H3rV3r492tmNcqwo"; 
+  // GÜVENLİK GÜNCELLEMESİ: Key'i .env dosyasından çekiyoruz
+  const FIREBASE_API_KEY = process.env.FIREBASE_API_KEY; 
+
+  // Eğer .env dosyası okunamazsa hata verelim ki sorunu hemen anla
+  if (!FIREBASE_API_KEY) {
+    console.error("HATA: .env dosyasında FIREBASE_API_KEY bulunamadı!");
+    return res.status(500).json({ error: "Sunucu yapılandırma hatası (API Key eksik)." });
+  }
 
   const url = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${FIREBASE_API_KEY}`;
 
@@ -75,6 +84,7 @@ exports.login = async (req, res) => {
     });
 
   } catch (error) {
+    // Hata mesajını detaylı logla ama kullanıcıya genel bilgi ver
     console.error("Login Hatası:", error.response?.data?.error?.message || error.message);
     res.status(401).json({ error: "E-posta veya şifre hatalı!" });
   }
