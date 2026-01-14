@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom'; // useNavigate ekle
 import axios from 'axios';
 
 const Applicants = () => {
   const { id } = useParams();
+  const navigate = useNavigate(); // Yönlendirme için
   const [applicants, setApplicants] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const fetchApplicants = async () => {
@@ -16,38 +17,62 @@ const Applicants = () => {
         });
         setApplicants(response.data);
       } catch (err) {
-        alert('Başvuranlar yüklenemedi. Yetkiniz olmayabilir.');
-      } finally {
-        setLoading(false);
+        console.error("Başvuranlar çekilemedi");
       }
     };
     fetchApplicants();
   }, [id]);
 
-  if (loading) return <div>Yükleniyor...</div>;
+  // İşe Alma Fonksiyonu
+  const handleHire = async (appId) => {
+    if (!window.confirm("Bu kişiyi işe almak istediğinize emin misiniz?")) return;
+    
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('userToken');
+      await axios.post(`http://localhost:3000/jobs/${id}/accept/${appId}`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      alert("İşçi başarıyla işe alındı!");
+      navigate('/dashboard'); // Dashboard'a dön
+    } catch (err) {
+      alert("İşe alım başarısız oldu.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <div style={{maxWidth: '800px', margin: '30px auto', padding: '20px'}}>
-      <h2>Başvuranlar Listesi</h2>
-      {applicants.length === 0 ? (
-        <p>Henüz başvuru yok.</p>
-      ) : (
-        <div style={{display: 'flex', flexDirection: 'column', gap: '15px'}}>
+    <div style={{ maxWidth: '800px', margin: '30px auto', padding: '20px' }}>
+      <h2>Başvuranlar</h2>
+      {applicants.length === 0 ? <p>Henüz başvuru yok.</p> : (
+        <div style={{display: 'grid', gap: '15px'}}>
           {applicants.map(app => (
-            <div key={app.id} style={{background: 'white', padding: '15px', borderRadius: '8px', border: '1px solid #ddd', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+            <div key={app.id} style={{
+              border: '1px solid #ddd', padding: '15px', borderRadius: '8px',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'white'
+            }}>
               <div>
-                <h4>{app.workerName}</h4>
-                <p style={{fontSize: '14px', color: '#666'}}>Başvuru Tarihi: {new Date(app.appliedAt).toLocaleDateString()}</p>
-                <span style={{
-                  padding: '4px 8px', borderRadius: '4px', fontSize: '12px',
-                  background: app.status === 'pending' ? '#fff3cd' : '#d4edda'
-                }}>
-                  Durum: {app.status === 'pending' ? 'Bekliyor' : app.status}
-                </span>
+                <strong>{app.workerName}</strong>
+                <div style={{fontSize: '12px', color: '#666'}}>{new Date(app.appliedAt).toLocaleDateString()}</div>
+                <div style={{marginTop: '5px', color: app.status === 'accepted' ? 'green' : 'orange'}}>
+                  Durum: {app.status === 'accepted' ? '✅ İşe Alındı' : '⏳ Bekliyor'}
+                </div>
               </div>
-              <button style={{padding: '8px 15px', background: '#28a745', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer'}}>
-                Onayla ve İşe Başlat
-              </button>
+              
+              {/* Sadece kabul edilmemişse butonu göster */}
+              {app.status !== 'accepted' && (
+                <button 
+                  onClick={() => handleHire(app.id)}
+                  disabled={loading}
+                  style={{
+                    background: '#28a745', color: 'white', border: 'none', 
+                    padding: '8px 15px', borderRadius: '4px', cursor: 'pointer'
+                  }}
+                >
+                  {loading ? 'İşleniyor...' : 'İşe Al'}
+                </button>
+              )}
             </div>
           ))}
         </div>
