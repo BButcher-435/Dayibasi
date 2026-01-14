@@ -1,28 +1,23 @@
 const express = require('express');
-// ... diğer importların (cors, dotenv vs.) burada kalsın
-
-// YENİ EKLEMEN GEREKEN TEK SATIR BU:
-const { auth } = require('./firebase'); 
+const cors = require('cors');
+// Controller'ı doğru klasörden çağırıyoruz
+const { register, login } = require('./controllers/authController');
 
 const app = express();
-app.use(express.json()); // JSON verisi alıyorsan bu gereklidir
 
-// Örnek: Token Kontrolü Yapan Endpoint
-app.post('/api/verify-token', async (req, res) => {
-    try {
-        const { token } = req.body; // Frontend'den gelen token
-        
-        // ESKİDEN: admin.auth().verifyIdToken(...)
-        // ŞİMDİ SADECE:
-        const decodedToken = await auth.verifyIdToken(token);
-        
-        res.json({ uid: decodedToken.uid, email: decodedToken.email });
-    } catch (error) {
-        console.error("Token hatası:", error);
-        res.status(401).send("Yetkisiz giriş");
-    }
+app.use(cors());
+app.use(express.json());
+
+// --- ROTALAR ---
+app.get('/', (req, res) => {
+  res.send('Server (isbul v4) Hazır! 🚀');
 });
 
-app.listen(3000, () => {
-    console.log('Server 3000 portunda çalışıyor');
+// Kayıt ve Giriş rotalarını direkt buraya bağlıyoruz
+app.post('/register', register);
+app.post('/login', login);
+
+const PORT = 3000;
+app.listen(PORT, () => {
+  console.log(`Server ${PORT} portunda çalışıyor...`);
 });

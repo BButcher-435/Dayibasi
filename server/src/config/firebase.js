@@ -1,18 +1,15 @@
-// Eski require('firebase-admin') yöntemini kullanmıyoruz.
-// Yeni versiyon (v13+) için doğrusu bu:
-
 const { initializeApp, cert } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
+const { getFirestore } = require("firebase-admin/firestore");
 
-// Anahtar dosyan bir üst klasörde olduğu için '../' kullanıyoruz
-const serviceAccount = require("../serviceAccountKey.json");
+// Dosya artık hemen yanımızda (src/config/ içinde)
+const serviceAccount = require("./serviceAccountKey.json");
 
 const app = initializeApp({
   credential: cert(serviceAccount)
 });
 
-// Auth yetkisini alıyoruz
 const auth = getAuth(app);
+const db = getFirestore(app);
 
-// Sadece auth'u dışarı açıyoruz, böylece "admin.auth" demene gerek kalmayacak
-module.exports = { auth };
+module.exports = { auth, db };
