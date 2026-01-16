@@ -32,8 +32,7 @@ Dayıbaşı, işverenler ile günlük/saha işçilerini buluşturan, güvenli ö
 ---
 
 ## Proje Yapısı ve Diyagramı
-
-``` mermaid
+(mermaid)
 graph TD
     subgraph "Frontend (React)"
         A[App.jsx] --> B[AuthContext.jsx]
@@ -89,6 +88,6 @@ npm run dev
 
 [ ] Push bildirimleri.
 
-Geliştirici: Burak Enes
+Geliştirici: BButcher-435 ,  boratasi , furkanozatlar , yeahcel
 
 Durum: V4 MVP Tamamlandı ✅
