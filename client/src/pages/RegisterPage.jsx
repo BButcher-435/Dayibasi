@@ -27,7 +27,8 @@ const RegisterPage = () => {
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:3000/register', {
+      // 🛑 DÜZELTME 1: Adres '/auth/register' olarak güncellendi.
+      const response = await fetch('http://localhost:3000/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
@@ -39,19 +40,15 @@ const RegisterPage = () => {
         throw new Error(data.error || 'Kayıt başarısız');
       }
 
-      // LOCALSTORAGE'A KAYDET
-      localStorage.setItem('userToken', data.token);
-      localStorage.setItem('userUid', data.uid);
-      localStorage.setItem('userFirstName', formData.firstName);
-      localStorage.setItem('userLastName', formData.lastName);
-      localStorage.setItem('userName', `${formData.firstName} ${formData.lastName}`);
-      localStorage.setItem('userRole', formData.role); // FORMDA SEÇİLEN ROLE'Ü KAYDET
-      localStorage.setItem('userEmail', formData.email);
-      
-      console.log("KAYDEDİLEN ROLE:", formData.role); // DEBUG
+      // 🛑 DÜZELTME 2: 
+      // Backend artık kayıt anında token göndermiyor (güvenlik standardı).
+      // O yüzden localStorage işlemlerini sildik.
+      // Kullanıcı "Kayıt Başarılı" mesajını görecek ve Login sayfasına gidecek.
 
-      setMessage('Kayıt Başarılı!');
-      setTimeout(() => navigate('/dashboard'), 1500);
+      setMessage('Kayıt Başarılı! Giriş sayfasına yönlendiriliyorsunuz...');
+      
+      // 1.5 saniye sonra Giriş Sayfasına (Login) yönlendir
+      setTimeout(() => navigate('/login'), 1500);
 
     } catch (err) {
       setError(err.message || 'Bir hata oluştu.');
@@ -60,6 +57,7 @@ const RegisterPage = () => {
     }
   };
 
+  // 👇 TASARIM KISMI AYNI KALDI
   return (
     <div style={{maxWidth: '500px', margin: '30px auto'}}>
       <div style={{background: 'white', padding: '30px', borderRadius: '10px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)'}}>

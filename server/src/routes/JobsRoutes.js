@@ -1,57 +1,45 @@
 const express = require('express');
 const router = express.Router();
-const verifyToken = require('../middleware/authMiddleware');
+const jobsController = require('../controllers/jobscontroller'); // Controller'ı çağır
+const verifyToken = require('../middleware/authMiddleware'); // Güvenlik kilidi
 
-// Controller Fonksiyonlarını Import Et
-const { 
-  createJob, 
-  getAllJobs, 
-  applyJob, 
-  getJob, 
-  getJobApplicants,
-  checkApplicationStatus,
-  getDashboardStats,
-  acceptApplication, // Yeni: İşe alım
-  completeJob,       // Yeni: İş tamamlama
-  rateUser           // Yeni: Puanlama
-} = require('../controllers/jobscontroller');
+// --- 1. İLAN İŞLEMLERİ ---
+// İlan oluştur (Sadece giriş yapmış işverenler)
+router.post('/', verifyToken, jobsController.createJob);
 
-// --- ÖZEL ROTALAR (Statik yollar en üste!) ---
+// Tüm ilanları listele (Herkese açık)
+router.get('/', jobsController.getAllJobs);
 
-// 1. Dashboard Verileri
-router.get('/dashboard', verifyToken, getDashboardStats);
+// Dashboard verilerini çek (ÖNEMLİ: /dashboard, /:id'den ÖNCE gelmeli yoksa dashboard'u id sanar!)
+router.get('/dashboard', verifyToken, jobsController.getDashboardStats);
 
-// 2. Tüm İlanları Listele
-router.get('/', getAllJobs);
+// Tek bir ilanın detayını getir (Herkese açık)
+router.get('/:id', jobsController.getJob);
 
 
-// --- ID GEREKTİREN ROTALAR ---
+// --- 2. BAŞVURU İŞLEMLERİ ---
+// İşe başvur (Sadece işçiler)
+router.post('/:id/apply', verifyToken, jobsController.applyForJob);
 
-// 3. Başvuru Durumu Kontrolü
-router.get('/:id/check', verifyToken, checkApplicationStatus);
+// Başvuranları gör (Sadece işveren)
+router.get('/:id/applicants', verifyToken, jobsController.getJobApplicants);
 
-// 4. Başvuranları Gör (İşveren için)
-router.get('/:id/applicants', verifyToken, getJobApplicants);
+// Başvuru durumunu kontrol et (Daha önce başvurdum mu?)
+router.get('/:id/check-status', verifyToken, jobsController.checkApplicationStatus);
 
-// 5. İşe Alım İşlemi (Belirli bir başvuruyu kabul et)
-router.post('/:id/accept/:appId', verifyToken, acceptApplication);
-
-// 6. İşi Tamamla
-router.post('/:id/complete', verifyToken, completeJob);
-
-// 7. İşe Başvur
-router.post('/:id/apply', verifyToken, applyJob);
-
-// 8. Puan Ver (İş bittikten sonra)
-router.post('/:id/rate', verifyToken, rateUser);
-
-// 9. Tek İlan Detayı (Parametreli genel yol olduğu için sonda)
-router.get('/:id', getJob);
+// Başvuru durumunu güncelle (Kabul Et / Reddet)
+// Frontend bu adrese istek atıyor: /jobs/:id/applicants/:userId
+router.post('/:id/applicants/:userId', verifyToken, jobsController.updateApplicantStatus);
 
 
-// --- OLUŞTURMA ---
+// --- 3. İŞ BİTİRME VE PUANLAMA ---
+// İşi tamamla (Parayı aktar)
+router.post('/:id/complete', verifyToken, jobsController.completeJob);
 
-// 10. İlan Oluştur
-router.post('/', verifyToken, createJob);
+// Puan ver
+router.post('/:id/rate', verifyToken, jobsController.rateUser);
+
+// Kullanıcı yorumlarını getir
+router.get('/reviews/:id', jobsController.getUserReviews);
 
 module.exports = router;

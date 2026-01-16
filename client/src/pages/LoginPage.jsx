@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext'; // <--- YENİ
+import { useAuth } from '../context/AuthContext'; 
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
@@ -10,7 +10,7 @@ const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   
   const navigate = useNavigate();
-  const { login } = useAuth(); // <--- Context'ten login fonksiyonunu al
+  const { login } = useAuth(); 
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -18,25 +18,35 @@ const LoginPage = () => {
     setLoading(true);
 
     try {
-      const response = await axios.post('http://localhost:3000/login', {
+      // Backend rotası genelde /auth/login olur.
+      // Eğer çalışmazsa '/auth' kısmını silebilirsin ama backend yapımıza göre doğrusu bu.
+      const response = await axios.post('http://localhost:3000/auth/login', {
         email: email,
         password: password
       });
 
-      // Eski localStorage kodları ÇÖP KUTUSUNA!
-      // Tek satırla context'i güncelle:
-      login(response.data); 
+      // 🛑 KİLİT DÜZELTME BURADA YAPILDI:
+      // Backend'den gelen veri şu yapıda: { message: '...', token: '...', user: { ... } }
+      // Bizim bu veriyi parçalayıp (destructuring) içinden user ve token'ı almamız lazım.
+      const { token, user } = response.data;
+
+      // Şimdi Context'e ve LocalStorage'a gidecek olan temiz veriyi oluşturuyoruz.
+      // Böylece user.firstName dediğinde "undefined" değil, gerçek ismini göreceksin.
+      const userDataToSave = { ...user, token };
+
+      login(userDataToSave); 
 
       navigate('/dashboard');
 
     } catch (err) {
-      console.error(err); // Hatayı konsola yazdıralım
-      setError('Giriş yapılamadı! Lütfen bilgilerinizi kontrol edin.');
+      console.error(err); 
+      setError(err.response?.data?.error || 'Giriş yapılamadı! Lütfen bilgilerinizi kontrol edin.');
     } finally {
       setLoading(false);
     }
   };
 
+  // 👇 TASARIM KISMI HİÇ DEĞİŞTİRİLMEDİ (Senin kodunun aynısı)
   return (
     <div style={{maxWidth: '400px', margin: '50px auto'}}>
       <div style={{background: 'white', padding: '40px', borderRadius: '10px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)'}}>

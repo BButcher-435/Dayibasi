@@ -6,70 +6,71 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Uygulama açıldığında localStorage'dan kullanıcıyı geri yükle
+  // --- 1. UYGULAMA AÇILINCA KULLANICIYI HATIRLA ---
   useEffect(() => {
     const checkUser = () => {
-      const token = localStorage.getItem('userToken');
-      const uid = localStorage.getItem('userUid');
-      const firstName = localStorage.getItem('userFirstName');
-      const lastName = localStorage.getItem('userLastName');
-      const role = localStorage.getItem('userRole');
-      const email = localStorage.getItem('userEmail');
+      try {
+        const storedToken = localStorage.getItem('token');
+        const storedUser = localStorage.getItem('user');
 
-      if (token && uid) {
-        setUser({
-          token,
-          uid,
-          firstName,
-          lastName,
-          role,
-          email,
-          fullName: `${firstName} ${lastName}`
-        });
+        if (storedToken && storedUser) {
+          // JSON formatındaki veriyi tekrar objeye çeviriyoruz
+          const parsedUser = JSON.parse(storedUser);
+          
+          // Token'ı da objeye ekleyip state'e atıyoruz
+          setUser({ ...parsedUser, token: storedToken });
+        }
+      } catch (error) {
+        // Eğer veri bozulmuşsa temizle
+        console.error("Oturum kurtarma hatası:", error);
+        localStorage.clear();
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
     checkUser();
   }, []);
 
-  // Giriş Yapma Fonksiyonu
+  // --- 2. GİRİŞ YAPMA (LOGIN) ---
   const login = (userData) => {
-    // Önce LocalStorage'a kaydet
-    localStorage.setItem('userToken', userData.token);
-    localStorage.setItem('userUid', userData.uid);
-    localStorage.setItem('userFirstName', userData.firstName);
-    localStorage.setItem('userLastName', userData.lastName);
-    localStorage.setItem('userRole', userData.role);
-    localStorage.setItem('userEmail', userData.email);
-    localStorage.setItem('userName', `${userData.firstName} ${userData.lastName}`);
+    // userData şunun gibi geliyor: { uid: '...', firstName: '...', token: '...', balance: 500 ... }
+    
+    // 1. Token ve Diğer Bilgileri Ayıralım
+    const { token, ...restOfUser } = userData;
 
-    // Sonra State'i güncelle (Sayfa yenilemeye gerek kalmaz!)
-    setUser({
-      ...userData,
-      fullName: `${userData.firstName} ${userData.lastName}`
-    });
+    // 2. LocalStorage'a Kaydet (Tek parça halinde!)
+    localStorage.setItem('token', token); 
+    localStorage.setItem('user', JSON.stringify(restOfUser)); // Nesneyi string'e çevirip sakla
+
+    // 3. State'i Güncelle
+    setUser(userData);
   };
 
-  // Çıkış Yapma Fonksiyonu
+  // --- 3. ÇIKIŞ YAPMA (LOGOUT) ---
   const logout = () => {
-    localStorage.clear();
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    // Eski parça parça kalanlar varsa onları da temizleyelim (Garanti olsun)
+    localStorage.removeItem('userToken');
+    localStorage.removeItem('userUid');
+    localStorage.removeItem('userFirstName');
+    localStorage.removeItem('userLastName');
+    
     setUser(null);
   };
 
-  // Profil Güncelleme Fonksiyonu
+  // --- 4. PROFİL GÜNCELLEME ---
   const updateProfile = (updatedData) => {
-    // LocalStorage güncelle
-    localStorage.setItem('userFirstName', updatedData.firstName);
-    localStorage.setItem('userLastName', updatedData.lastName);
-    localStorage.setItem('userEmail', updatedData.email);
-    localStorage.setItem('userPhone', updatedData.phone);
-    
-    // State güncelle
-    setUser(prev => ({
-      ...prev,
-      ...updatedData,
-      fullName: `${updatedData.firstName} ${updatedData.lastName}`
-    }));
+    // Mevcut kullanıcı verisiyle yeni gelen veriyi birleştir
+    // (Örn: Sadece isim değiştiyse, bakiye eski haliyle kalsın)
+    const newUserState = { ...user, ...updatedData };
+
+    // State'i güncelle
+    setUser(newUserState);
+
+    // LocalStorage'ı güncelle (Token hariç)
+    const { token, ...userToStore } = newUserState;
+    localStorage.setItem('user', JSON.stringify(userToStore));
   };
 
   return (
@@ -79,5 +80,5 @@ export const AuthProvider = ({ children }) => {
   );
 };
 
-// Kolay kullanım için hook
+// Hook
 export const useAuth = () => useContext(AuthContext);

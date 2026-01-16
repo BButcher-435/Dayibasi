@@ -1,21 +1,30 @@
 const express = require("express");
 const router = express.Router();
 
-// Controller'dan fonksiyonları alıyoruz
-const { register, login, updateProfile } = require("../controllers/authController");
+// 1. Controller fonksiyonlarını içe aktar (getUserProfile'ı listeye ekledim)
+const { 
+  register, 
+  login, 
+  updateProfile, 
+  deposit, 
+  getUserProfile 
+} = require("../controllers/authController");
 
-// Güvenlik için middleware'i alıyoruz
 const verifyToken = require("../middleware/authMiddleware");
 
 // --- ROTALAR ---
 
-// Kayıt Ol (Herkese Açık)
+// Kayıt ve Giriş
 router.post("/register", register);
-
-// Giriş Yap (Herkese Açık)
 router.post("/login", login);
 
-// Profil Güncelle (Korumalı - Sadece giriş yapmış kullanıcılar)
+// Profil İşlemleri
 router.put("/update-profile", verifyToken, updateProfile);
+
+// 🔥 DÜZELTME BURADA: Artık 'authController.getUserProfile' değil, direkt 'getUserProfile'
+router.get('/user/:id', getUserProfile);
+
+// Para Yükle
+router.post("/deposit", verifyToken, deposit);
 
 module.exports = router;

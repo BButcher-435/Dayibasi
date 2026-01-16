@@ -1,61 +1,31 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext'; // <--- YENİ
 import axios from 'axios';
-const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setMessage('');
+import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
-    try {
-      const token = localStorage.getItem('userToken');
-      
-      // 1. Backend'e kaydet (YENİ KISIM)
-      await axios.put('http://localhost:3000/update-profile', formData, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      // 2. Frontend State'ini güncelle
-      updateProfile(formData);
-
-      setMessage('Profil bilgileriniz başarıyla güncellendi!');
-      
-      setTimeout(() => {
-        navigate('/dashboard');
-      }, 1000);
-      
-    } catch (err) {
-      console.error(err);
-      setMessage('Güncelleme başarısız! Sunucu hatası.');
-    } finally {
-      setLoading(false);
-    }
-  };
-  
 const ProfileSettings = () => {
-  const { user, updateProfile } = useAuth(); // <--- Context'ten veriyi ve fonksiyonu al
+  const { user, updateProfile } = useAuth(); // Context'ten verileri al
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
-    email: '',
     phone: '',
     bio: ''
   });
-  
+
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
 
-  // Sayfa açıldığında context'teki veriyi forma doldur
+  // Sayfa açılınca mevcut bilgileri forma doldur
   useEffect(() => {
     if (user) {
       setFormData({
         firstName: user.firstName || '',
         lastName: user.lastName || '',
-        email: user.email || '',
         phone: user.phone || '',
-        bio: user.bio || '' // Eğer bio varsa
+        bio: user.bio || '' // Biyografi varsa getir
       });
     }
   }, [user]);
@@ -68,128 +38,110 @@ const ProfileSettings = () => {
     e.preventDefault();
     setLoading(true);
     setMessage('');
+    setError('');
 
     try {
-      // Context üzerinden güncelle (API isteği burada da yapılabilir ama şimdilik state güncelliyoruz)
-      // Gerçek projede burada önce axios.put('/users/me') yapılır, sonra updateProfile çağrılır.
-      updateProfile(formData);
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error("Oturum süresi dolmuş.");
 
-      setMessage('Profil bilgileriniz başarıyla güncellendi!');
+      // 🛑 DÜZELTME: Doğru adrese istek atıyoruz
+      const response = await axios.put('http://localhost:3000/auth/update-profile', formData, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      // Başarılı! Context'teki kullanıcı bilgisini de güncelle (Anında yansısın)
+      if (updateProfile) {
+        updateProfile(response.data.user);
+      }
+
+      setMessage('✅ Profiliniz başarıyla güncellendi!');
       
-      // Hızlıca dashboard'a dön
+      // 1.5 saniye sonra profil sayfasına yönlendir
       setTimeout(() => {
-        navigate('/dashboard');
-      }, 1000);
-      
+        navigate(`/profile/${user.uid || user.id}`);
+      }, 1500);
+
     } catch (err) {
-      setMessage('Güncelleme başarısız!');
+      console.error(err);
+      setError('❌ Güncelleme sırasında bir hata oluştu.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div style={{maxWidth: '600px', margin: '30px auto'}}>
-      <div style={{background: 'white', padding: '30px', borderRadius: '10px', boxShadow: '0 2px 15px rgba(0,0,0,0.1)'}}>
-        <h2 style={{textAlign: 'center', marginBottom: '30px'}}>Profil Ayarları</h2>
+    <div style={{ maxWidth: '600px', margin: '40px auto', background: 'white', padding: '30px', borderRadius: '10px', boxShadow: '0 4px 10px rgba(0,0,0,0.1)' }}>
+      <h2 style={{ textAlign: 'center', marginBottom: '20px', color: '#333' }}>Profil Ayarları</h2>
+
+      {message && <div style={{ background: '#d4edda', color: '#155724', padding: '12px', borderRadius: '6px', marginBottom: '20px' }}>{message}</div>}
+      {error && <div style={{ background: '#f8d7da', color: '#721c24', padding: '12px', borderRadius: '6px', marginBottom: '20px' }}>{error}</div>}
+
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
         
-        {message && (
-          <div style={{
-            background: message.includes('başarısız') ? '#f8d7da' : '#d4edda',
-            color: message.includes('başarısız') ? '#721c24' : '#155724',
+        <div style={{ display: 'flex', gap: '15px' }}>
+          <div style={{ flex: 1 }}>
+            <label style={{ fontWeight: '600', display: 'block', marginBottom: '5px' }}>Ad</label>
+            <input 
+              name="firstName" 
+              value={formData.firstName} 
+              onChange={handleChange} 
+              required 
+              style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '5px', boxSizing:'border-box' }}
+            />
+          </div>
+          <div style={{ flex: 1 }}>
+            <label style={{ fontWeight: '600', display: 'block', marginBottom: '5px' }}>Soyad</label>
+            <input 
+              name="lastName" 
+              value={formData.lastName} 
+              onChange={handleChange} 
+              required 
+              style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '5px', boxSizing:'border-box' }}
+            />
+          </div>
+        </div>
+
+        <div>
+          <label style={{ fontWeight: '600', display: 'block', marginBottom: '5px' }}>Telefon</label>
+          <input 
+            name="phone" 
+            value={formData.phone} 
+            onChange={handleChange} 
+            placeholder="0555..." 
+            style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '5px', boxSizing:'border-box' }}
+          />
+        </div>
+
+        <div>
+          <label style={{ fontWeight: '600', display: 'block', marginBottom: '5px' }}>Biyografi (Hakkımda)</label>
+          <textarea 
+            name="bio" 
+            value={formData.bio} 
+            onChange={handleChange} 
+            placeholder="Kendinizden kısaca bahsedin..." 
+            rows="4" 
+            style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '5px', fontFamily: 'inherit', boxSizing:'border-box' }}
+          />
+        </div>
+
+        <button 
+          type="submit" 
+          disabled={loading}
+          style={{
+            marginTop: '10px',
             padding: '12px',
+            background: loading ? '#ccc' : '#007bff',
+            color: 'white',
+            border: 'none',
             borderRadius: '6px',
-            marginBottom: '20px',
-            textAlign: 'center'
-          }}>
-            {message}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} style={{display: 'flex', flexDirection: 'column', gap: '20px'}}>
-          <div style={{display: 'flex', gap: '15px'}}>
-            <div style={{flex: 1}}>
-              <label style={{display: 'block', marginBottom: '5px', fontWeight: '600'}}>Ad</label>
-              <input
-                type="text"
-                name="firstName"
-                value={formData.firstName}
-                onChange={handleChange}
-                required
-                style={{width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '6px'}}
-              />
-            </div>
-            
-            <div style={{flex: 1}}>
-              <label style={{display: 'block', marginBottom: '5px', fontWeight: '600'}}>Soyad</label>
-              <input
-                type="text"
-                name="lastName"
-                value={formData.lastName}
-                onChange={handleChange}
-                required
-                style={{width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '6px'}}
-              />
-            </div>
-          </div>
-
-          <div>
-            <label style={{display: 'block', marginBottom: '5px', fontWeight: '600'}}>E-posta</label>
-            <input
-              type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              required
-              style={{width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '6px'}}
-            />
-          </div>
-
-          <div>
-            <label style={{display: 'block', marginBottom: '5px', fontWeight: '600'}}>Telefon</label>
-            <input
-              type="tel"
-              name="phone"
-              value={formData.phone}
-              onChange={handleChange}
-              placeholder="05xx xxx xx xx"
-              style={{width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '6px'}}
-            />
-          </div>
-
-          <div style={{display: 'flex', justifyContent: 'flex-end', gap: '15px', marginTop: '20px'}}>
-            <button
-              type="button"
-              onClick={() => navigate('/dashboard')}
-              style={{
-                padding: '12px 25px',
-                background: '#6c757d',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: 'pointer'
-              }}
-            >
-              İptal
-            </button>
-            
-            <button
-              type="submit"
-              disabled={loading}
-              style={{
-                padding: '12px 30px',
-                background: loading ? '#ccc' : '#28a745',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: 'pointer'
-              }}
-            >
-              {loading ? 'Kaydediliyor...' : 'Kaydet'}
-            </button>
-          </div>
-        </form>
-      </div>
+            cursor: 'pointer',
+            fontWeight: 'bold',
+            fontSize: '16px'
+          }}
+        >
+          {loading ? 'Kaydediliyor...' : '💾 Değişiklikleri Kaydet'}
+        </button>
+      </form>
     </div>
   );
 };

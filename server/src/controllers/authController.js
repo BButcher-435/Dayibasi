@@ -1,100 +1,193 @@
-// server/src/controllers/authController.js
+const { db } = require('../config/firebase');
+const jwt = require('jsonwebtoken');
 require('dotenv').config();
-const { auth, db } = require('../config/firebase'); 
-const axios = require('axios');
 
-// --- REGISTER (KAYIT) ---
+// --- 1. KAYIT OL (REGISTER) ---
 exports.register = async (req, res) => {
-  const { email, password, firstName, lastName, phone, role } = req.body;
-
-  if (!email || !password || password.length < 6) {
-    return res.status(400).json({ error: "E-posta veya şifre geçersiz (min 6 karakter)." });
-  }
-
   try {
-    const userRecord = await auth.createUser({
-      email,
-      password,
-      displayName: `${firstName} ${lastName}`
-    });
+    const { email, password, firstName, lastName, role, phone, bio } = req.body;
 
-    await db.collection('users').doc(userRecord.uid).set({
-      firstName,
-      lastName,
-      email,
-      phone,
-      role: role || 'worker',
-      createdAt: new Date().toISOString(),
-      uid: userRecord.uid
-    });
-
-    res.status(201).json({ message: "Kayıt Başarılı", uid: userRecord.uid });
-
-  } catch (error) {
-    console.error("Register Hatası:", error);
-    if (error.code === 'auth/email-already-exists') {
-        return res.status(409).json({ error: "Bu e-posta zaten kullanımda." });
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email ve şifre zorunludur.' });
     }
-    res.status(400).json({ error: "Kayıt işlemi başarısız." });
+
+    const userCheck = await db.collection('users').where('email', '==', email).get();
+    if (!userCheck.empty) {
+      return res.status(400).json({ error: 'Bu email zaten kullanımda.' });
+    }
+
+    const newUserRef = db.collection('users').doc();
+    const newUser = {
+      firstName: firstName || 'İsimsiz',
+      lastName: lastName || 'Kullanıcı',
+      email,
+      password, // Gerçek projede hashlenmeli
+      role: role || 'worker',
+      phone: phone || '',
+      bio: bio || '',
+      balance: 0,
+      createdAt: new Date().toISOString()
+    };
+
+    await newUserRef.set(newUser);
+    res.status(201).json({ message: 'Kayıt başarılı! Giriş yapabilirsiniz.' });
+
+  } catch (error) {
+    console.error("Kayıt hatası:", error);
+    res.status(500).json({ error: 'Kayıt işlemi başarısız.' });
   }
 };
 
-// --- LOGIN (GİRİŞ) ---
+// --- 2. GİRİŞ YAP (LOGIN - JWT) ---
 exports.login = async (req, res) => {
-  const { email, password } = req.body;
-  const FIREBASE_API_KEY = process.env.FIREBASE_API_KEY; 
-
-  if (!FIREBASE_API_KEY) {
-    console.error("HATA: .env dosyasında FIREBASE_API_KEY bulunamadı!");
-    return res.status(500).json({ error: "Sunucu yapılandırma hatası." });
-  }
-
-  const url = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${FIREBASE_API_KEY}`;
-
   try {
-    const response = await axios.post(url, {
-      email,
-      password,
-      returnSecureToken: true
-    });
+    const { email, password } = req.body;
 
-    const { idToken, localId } = response.data;
-    const userDoc = await db.collection('users').doc(localId).get();
-    const userData = userDoc.exists ? userDoc.data() : {};
+    const usersRef = db.collection('users');
+    const snapshot = await usersRef.where('email', '==', email).get();
 
-    res.status(200).json({ 
-      message: "Giriş Başarılı", 
-      token: idToken, 
-      uid: localId,
+    if (snapshot.empty) {
+      return res.status(400).json({ error: 'Kullanıcı bulunamadı.' });
+    }
+
+    const userDoc = snapshot.docs[0];
+    const userData = userDoc.data();
+    const uid = userDoc.id;
+
+    if (userData.password !== password) {
+      return res.status(400).json({ error: 'Hatalı şifre!' });
+    }
+
+    // Token Oluştur
+    const token = jwt.sign(
+      { uid: uid, email: userData.email, role: userData.role }, 
+      'GIZLI_ANAHTAR', 
+      { expiresIn: '24h' }
+    );
+
+    // Frontend için temiz veri
+    const safeUser = {
+      uid: uid,
+      firstName: userData.firstName || 'Misafir',
+      lastName: userData.lastName || '',
+      email: userData.email,
       role: userData.role || 'worker',
-      firstName: userData.firstName,
-      lastName: userData.lastName,
-      email: userData.email
+      balance: userData.balance || 0,
+      bio: userData.bio || '',
+      phone: userData.phone || ''
+    };
+
+    console.log("✅ GİRİŞ YAPILDI: ", safeUser.firstName);
+
+    res.status(200).json({
+      message: 'Giriş başarılı',
+      token,
+      user: safeUser
     });
 
   } catch (error) {
-    console.error("Login Hatası:", error.message);
-    res.status(401).json({ error: "E-posta veya şifre hatalı!" });
+    console.error("Login hatası:", error);
+    res.status(500).json({ error: 'Sunucu hatası oluştu.' });
   }
 };
 
-// --- PROFİL GÜNCELLEME ---
+// --- 3. PROFİL GÜNCELLE (UPDATE PROFILE) --- 
+// ✅ AuthRoutes için eklendi
 exports.updateProfile = async (req, res) => {
   try {
     const { uid } = req.user;
     const { firstName, lastName, phone, bio } = req.body;
 
-    await db.collection('users').doc(uid).update({
+    const userRef = db.collection('users').doc(uid);
+    await userRef.update({
       firstName,
       lastName,
       phone,
-      bio,
-      updatedAt: new Date().toISOString()
+      bio
     });
 
-    res.status(200).json({ message: 'Profil başarıyla güncellendi.' });
+    // Güncel veriyi geri döndür ki frontend yenilesin
+    const updatedDoc = await userRef.get();
+    res.status(200).json({ message: 'Profil güncellendi.', user: { uid, ...updatedDoc.data() } });
+
   } catch (error) {
-    console.error("Profil güncellenemedi:", error);
-    res.status(500).json({ error: 'Profil güncellenemedi.' });
+    console.error("Profil güncelleme hatası:", error);
+    res.status(500).json({ error: 'Güncelleme başarısız.' });
+  }
+};
+
+// --- 4. PARA YÜKLE (DEPOSIT) ---
+// ✅ AuthRoutes için eklendi
+exports.deposit = async (req, res) => {
+  try {
+    const { uid } = req.user;
+    const { amount } = req.body;
+    const depositAmount = parseFloat(amount);
+
+    if (isNaN(depositAmount) || depositAmount <= 0) {
+      return res.status(400).json({ error: 'Geçerli bir miktar girin.' });
+    }
+
+    const userRef = db.collection('users').doc(uid);
+
+    await db.runTransaction(async (t) => {
+      const doc = await t.get(userRef);
+      if (!doc.exists) throw new Error("Kullanıcı bulunamadı.");
+      
+      const currentBalance = doc.data().balance || 0;
+      const newBalance = currentBalance + depositAmount;
+
+      t.update(userRef, { balance: newBalance });
+    });
+
+    res.status(200).json({ message: 'Para başarıyla yüklendi.' });
+
+  } catch (error) {
+    console.error("Para yükleme hatası:", error);
+    res.status(500).json({ error: 'İşlem başarısız.' });
+  }
+};
+
+// --- 🔥 LOGLU VERSİYON: KULLANICI PROFİLİNİ GETİR ---
+exports.getUserProfile = async (req, res) => {
+  try {
+    const { id } = req.params; // URL'den gelen ID
+    
+    // CASUS 1: Konsola gelen ID'yi yazdır
+    console.log(`📢 Profil İsteği Geldi! Aranan ID: "${id}"`);
+
+    if (!id || id === 'undefined' || id === 'null') {
+        console.log("❌ HATA: Geçersiz ID gönderildi.");
+        return res.status(400).json({ error: 'Geçersiz Kullanıcı ID.' });
+    }
+    
+    // Veritabanından kullanıcıyı bul
+    const userDoc = await db.collection('users').doc(id).get();
+
+    if (!userDoc.exists) {
+      console.log("❌ HATA: Veritabanında bu ID ile kayıt yok.");
+      return res.status(404).json({ error: 'Kullanıcı veritabanında bulunamadı.' });
+    }
+
+    const userData = userDoc.data();
+    console.log("✅ BAŞARILI: Kullanıcı bulundu:", userData.firstName);
+
+    // Güvenli veriyi hazırla
+    const safeData = {
+      uid: userDoc.id,
+      firstName: userData.firstName,
+      lastName: userData.lastName,
+      email: userData.email, 
+      role: userData.role,
+      balance: userData.balance, 
+      createdAt: userData.createdAt,
+      bio: userData.bio || '',
+      phone: userData.phone || ''
+    };
+
+    res.status(200).json(safeData);
+  } catch (error) {
+    console.error("🔥 SUNUCU HATASI (Profil Çekme):", error);
+    res.status(500).json({ error: 'Sunucu hatası.' });
   }
 };

@@ -1,31 +1,30 @@
-const { auth } = require('../config/firebase');
+const jwt = require('jsonwebtoken');
 
-const verifyToken = async (req, res, next) => {
-  console.log("-> Middleware Başladı: verifyToken");
+const verifyToken = (req, res, next) => {
+  // Token'ı header'dan al (Genelde "Bearer <token>" formatında gelir)
+  const tokenHeader = req.headers.authorization;
+
+  if (!tokenHeader) {
+    return res.status(401).json({ error: 'Erişim reddedildi. Token bulunamadı.' });
+  }
+
+  // "Bearer " kısmını atıp sadece kodu alıyoruz
+  const token = tokenHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ error: 'Geçersiz token formatı.' });
+  }
 
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.log("-> HATA: Header eksik veya yanlış format.");
-      return res.status(401).json({ error: 'Token bulunamadı.' });
-    }
-
-    const token = authHeader.split('Bearer ')[1];
-    console.log("-> Token Ayrıştırıldı (İlk 10 karakter):", token.substring(0, 10) + "...");
-
-    console.log("-> Firebase'e soruluyor: verifyIdToken...");
-    // BURASI KRİTİK: Eğer burada takılıyorsa Firebase bağlantısında sorun vardır
-    const decodedToken = await auth.verifyIdToken(token);
-    console.log("-> Firebase Yanıt Verdi! UID:", decodedToken.uid);
+    // Token'ı doğrula (Gizli anahtar authController ile AYNI olmalı)
+    const decoded = jwt.verify(token, 'GIZLI_ANAHTAR');
     
-    req.user = decodedToken;
-    
-    console.log("-> Controller'a geçiliyor (next)...");
+    // Doğrulanan kullanıcıyı request'e ekle ki diğer fonksiyonlar kullansın
+    req.user = decoded;
     next();
-
   } catch (error) {
-    console.error("-> MİDDLEWARE HATASI (Catch Bloğu):", error);
-    res.status(403).json({ error: 'Yetkilendirme hatası.' });
+    console.error("Token Hatası:", error.message);
+    res.status(403).json({ error: 'Geçersiz veya süresi dolmuş token.' });
   }
 };
 
